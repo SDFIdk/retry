@@ -1,0 +1,35 @@
+{
+  "name": "@dataforsyningen/retry",
+  "version": "0.1.0",
+  "description": "Klimadatastyrelsen's fetch retry library.",
+  "main": "./public/index.html",
+  "type": "module",
+  "scripts": {
+    "test": "node --test test/integration/*.test.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SDFIdk/retry.git"
+  },
+  "author": {
+    "name": "Klimadatastyrelsen",
+    "email": "support@kds.dk",
+    "url": "https://www.klimadatastyrelsen.dk/"
+  },
+  "keywords": [
+    "Klimadatastyrelsen",
+    "retry",
+    "Javascript"
+  ],
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/SDFIdk/retry/issues"
+  },
+  "homepage": "https://github.com/SDFIdk/retry#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "devDependencies": {
+    "nock": "^14.0.5"
+  }
+}
