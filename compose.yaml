@@ -1,0 +1,10 @@
+services:
+  node:
+    build: .
+    volumes:
+      - .:/app  # Mount current directory into the container
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - HOST=0.0.0.0
+    working_dir: /app  # Ensure the working directory is set properly
