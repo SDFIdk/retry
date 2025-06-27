@@ -7,7 +7,6 @@ const retries = 3
 const timeout = 500
 const growthFactor = 2
 const url = 'http://example.com'
-const testUrl = 'https://dummyjson.com/test/?delay='
 
 const mockCall = (delay = 0, count = 1) => {
   return nock(url)
@@ -88,7 +87,7 @@ describe('retry tests', async () => {
     }
   })
 
-  it('Check that the retry succeds after 408', async () => {
+  it('Check that the retry succeeds after 408', async () => {
     const scope = nock(url)
       .get('/')
       .reply(408, {})
