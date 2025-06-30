@@ -76,11 +76,10 @@ async function fetchWithRetry (url, options = {}) {
   } catch (error) {
     updateBaseTimeout(Date.now() - startTime)
     if (retries > 0) {
-      return fetchWithRetry(url, {
-        retries: retries - 1,
-        timeout: timeout * growthFactor,
-        growthFactor
-      })
+      const optionsCopy = JSON.parse(JSON.stringify(options))
+      optionsCopy.retries = retries - 1
+      optionsCopy.timeout = timeout * growthFactor
+      return fetchWithRetry(url, optionsCopy)
     } else {
       throw new Error(`All retries failed. Url: ${url}`)
     }
