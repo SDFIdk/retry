@@ -41,7 +41,7 @@ function updateBaseTimeout(responseTime) {
  * @returns 
  */
 async function fetchWithTimeout(url, options = {}) {
-  const { timeout = retryOptions.retries } = options
+  const { timeout = retryOptions.timeout } = options
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
   const response = await fetch(url, {
