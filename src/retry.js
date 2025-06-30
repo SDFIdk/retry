@@ -37,11 +37,11 @@ function updateBaseTimeout(responseTime) {
 /**
  * Fetch with a max timeout.
  * @param {*} url - The endpoint URL for the HTTP GET request.
- * @param {*} options - Options (timeout)
+ * @param {*} options - Options (timeout) and https://developer.mozilla.org/en-US/docs/Web/API/RequestInit
  * @returns 
  */
 async function fetchWithTimeout(url, options = {}) {
-  const { timeout = retryOptions.retries } = options
+  const { timeout = retryOptions.timeout } = options
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
   const response = await fetch(url, {
@@ -55,7 +55,7 @@ async function fetchWithTimeout(url, options = {}) {
 /**
  * Fetch with retry and a max timeout.
  * @param {String} url - The endpoint URL for the HTTP GET request.
- * @param {*} options - Options (retries, timeout, growthFactor)
+ * @param {*} options - Options (retries, timeout, growthFactor, statusCodes) and https://developer.mozilla.org/en-US/docs/Web/API/RequestInit
  * @returns *
  */
 async function fetchWithRetry (url, options = {}) {
@@ -67,7 +67,7 @@ async function fetchWithRetry (url, options = {}) {
   } = options
   const startTime = Date.now()
   try {
-    const response = await fetchWithTimeout(url, { timeout })
+    const response = await fetchWithTimeout(url, options)
     if (statusCodes.includes(response.status)) {
       throw new Error('Bad response')
     }

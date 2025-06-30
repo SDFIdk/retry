@@ -26,6 +26,7 @@ describe('dynamic timeout tests', async () => {
           growthFactor: 2
         }
       )
+      // 50 -> 100 -> 200 -> 400 -> 800 -> 1600
       assert.equal(retryOptions.timeout, 1600)
     } catch (error) {
       assert.fail(error.message)
@@ -44,6 +45,7 @@ describe('dynamic timeout tests', async () => {
           }
         )
       }
+      // 1600 -> 1200 -> 900 -> 675 -> 506.25 -> 379.6875 -> 284.765625
       assert.equal(retryOptions.timeout, 284.765625)
     } catch (error) {
       assert.fail(error.message)
@@ -60,6 +62,7 @@ describe('dynamic timeout tests', async () => {
           growthFactor: 2
         }
       )
+      // 50 -> 100 -> 200 -> 400
       assert.equal(retryOptions.timeout, 400)
       nock.cleanAll()
       mockCall(0, 50)
@@ -71,6 +74,7 @@ describe('dynamic timeout tests', async () => {
           }
         )
       }
+      // 400 -> 300
       assert.equal(retryOptions.timeout, 300)
     } catch (error) {
       assert.fail(error.message)

@@ -1,6 +1,6 @@
 {
   "name": "@dataforsyningen/retry",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Klimadatastyrelsen's fetch retry library.",
   "main": "./public/index.html",
   "type": "module",
