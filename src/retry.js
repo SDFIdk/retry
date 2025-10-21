@@ -76,7 +76,7 @@ async function fetchWithRetry (url, options = {}) {
   } catch (error) {
     updateBaseTimeout(Date.now() - startTime)
     if (retries > 0) {
-      const optionsCopy = JSON.parse(JSON.stringify(options))
+      const optionsCopy = structuredClone(options)
       optionsCopy.retries = retries - 1
       optionsCopy.timeout = timeout * growthFactor
       return fetchWithRetry(url, optionsCopy)
