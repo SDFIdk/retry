@@ -86,8 +86,135 @@ async function fetchWithRetry (url, options = {}) {
   }
 }
 
+/**
+ * Races a fetch attempt against a timeout while preserving the fetch promise.
+ * Used by retryPromiseAttempt to implement concurrent retry attempts.
+ * 
+ * Races three promises:
+ * 1. fetchWithTimeout with hard timeout (remainingTime)
+ * 2. Soft timeout that triggers next retry (options.timeout)
+ * 3. All previously active fetch attempts
+ * 
+ * @param {string} url - The endpoint URL
+ * @param {Object} options - Fetch options (timeout, statusCodes, etc.)
+ * @param {Array<Promise>} activeAttempts - Promises from previous attempts still running
+ * @param {number} attemptNumber - Current attempt number (0-indexed)
+ * @param {number} remainingTime - Hard timeout limit for fetchWithTimeout
+ * @returns {Promise<Object>} Resolves with:
+ *   - {success: true, promise, attemptNumber, response} if fetch completes before soft timeout
+ *   - {success: false, promise} if soft timeout expires (fetch continues in background)
+ *   - Previous attempt's result if it completes first
+ */
+const preserveFetchPromise = (url, options, activeAttempts, attemptNumber, remainingTime) => {
+  const {
+    timeout = retryOptions.timeout,
+    statusCodes = retryOptions.statusCodes
+  } = options
+
+  const startTime = Date.now()
+  let timedOut = false
+  const clonedOptions = structuredClone(options)
+  clonedOptions.timeout = remainingTime
+  const fetchPromise = new Promise(async (resolve, reject) => {
+    try {
+      const response = await fetchWithTimeout(url, clonedOptions)
+
+      const responseTime = Date.now() - startTime
+      updateBaseTimeout(responseTime)
+
+      if (statusCodes.includes(response.status)) {
+        reject(new Error(`Kald ${url} returnerede fejlkode ${response.status}`))
+      } else {
+        updateBaseTimeout(Date.now() - startTime)
+        resolve(response)
+      }
+    } catch (error) {
+      updateBaseTimeout(Date.now() - startTime)
+      reject(error)
+    }
+  }).then(response => {
+    updateBaseTimeout(Date.now() - startTime)
+    return ({ success: true, promise: fetchPromise, attemptNumber: attemptNumber, response })
+  })
+  const attemptarr = [fetchPromise,
+    new Promise(resolve => {
+      setTimeout(() => {
+        timedOut = true
+        resolve({ success: false, promise: fetchPromise, attemptNumber: attemptNumber })
+      }, timeout)
+    }),
+    ...activeAttempts]
+
+  return Promise.race([
+    ...attemptarr
+  ])
+}
+
+
+/**
+ * Recursively attempts fetch with exponentially increasing timeouts.
+ * Launches new attempts when soft timeouts expire while keeping previous attempts alive.
+ * 
+ * @param {number} attemptNumber - Current attempt number (0-indexed)
+ * @param {Array<Promise>} activeAttempts - Array of fetch promises from timed-out attempts still running
+ * @param {string} url - The endpoint URL
+ * @param {Object} options - Fetch options (timeout, statusCodes, etc.)
+ * @returns {Promise<Response>} Resolves with first successful response from any attempt
+ * @throws {AggregateError} When all attempts fail or exceed total timeout
+ */
+const retryPromiseAttempt = async (attemptNumber, activeAttempts, url, options) => {
+
+  const totalTimeout = retryOptions.totalTimeout
+  // Base case: all retries exhausted, wait for any active fetch to complete
+  if (attemptNumber > retryOptions.retries) {
+    return Promise.any(activeAttempts)
+  }
+
+  // Clone and increase timeout exponentially for this attempt
+  const optionsClone = structuredClone(options)
+  if(attemptNumber > 0) {
+    optionsClone.timeout = options.timeout * retryOptions.growthFactor
+  }
+
+  const attemptResult = await preserveFetchPromise(url, optionsClone, activeAttempts, attemptNumber, totalTimeout - optionsClone.timeout )
+
+  if (attemptResult.success) {
+    //console.log(`Fetch Promise ${attemptResult.attemptNumber} out of ${attemptNumber}`)
+    return attemptResult.response
+  } else {
+    activeAttempts.push(attemptResult.promise)
+    
+    return retryPromiseAttempt(attemptNumber + 1, activeAttempts, url, options)
+  }
+}
+
+/**
+ * Fetch with retry that keeps all attempts alive and resolves with the first successful response.
+ * Unlike fetchWithRetry, this preserves timed-out fetches and races them concurrently.
+ * 
+ * @param {string} url - The endpoint URL for the HTTP request
+ * @param {Object} options - Fetch options (retries, timeout, growthFactor, statusCodes) as well as normal Fetch Headers
+ * 
+ * @returns {Promise<Response>} Resolves with first successful response from any attempt
+ * @throws {Error} When all retry attempts fail
+ */
+const retryWithPromises = async (url, options = {}) => {
+  const {
+    timeout = retryOptions.timeout,
+    statusCodes = retryOptions.statusCodes,
+    growthFactor = retryOptions.growthFactor
+  } = options
+
+  try {
+    return await retryPromiseAttempt(0, [], url, { ...options, timeout, statusCodes, growthFactor})
+  } catch (error) {
+    throw new Error(`All retries failed. Url: ${url}`)
+  }
+}
+
 export {
   retryOptions,
   fetchWithTimeout,
-  fetchWithRetry
+  fetchWithRetry,
+  retryWithPromises
 }
