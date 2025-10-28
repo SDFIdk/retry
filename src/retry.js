@@ -3,7 +3,8 @@ import {
   RETRY_TIMEOUT,
   RETRY_GROWTH_FACTOR,
   RETRY_STATUS_CODES,
-  RETRY_DYNAMTIC_TIMEOUT
+  RETRY_DYNAMTIC_TIMEOUT,
+  getTotalTime
 } from './constants.js'
 
 const retryOptions = {
@@ -11,7 +12,8 @@ const retryOptions = {
   timeout: RETRY_TIMEOUT,
   growthFactor: RETRY_GROWTH_FACTOR,
   statusCodes: RETRY_STATUS_CODES,
-  dynamicTimeout: RETRY_DYNAMTIC_TIMEOUT
+  dynamicTimeout: RETRY_DYNAMTIC_TIMEOUT,
+  totalTimeout: getTotalTime(RETRY_TIMEOUT, RETRY_GROWTH_FACTOR, RETRY_ATTEMPTS)
 }
 
 let fetchCount = 0
@@ -28,9 +30,12 @@ function updateBaseTimeout(responseTime) {
   // Increase max timeout when average response time is more than half of the max.
   if (getAverageResponseTime() > retryOptions.timeout / 2) {
     retryOptions.timeout *= retryOptions.growthFactor
+    retryOptions.totalTime = getTotalTime(retryOptions.timeout, retryOptions.growthFactor, retryOptions.retries)
+
   // Reduce max timeout when the average response time is less than a quarter of the max.
   } else if (getAverageResponseTime() < retryOptions.timeout / 4) {
     retryOptions.timeout *= (1 / retryOptions.growthFactor) * 1.5
+    retryOptions.totalTime = getTotalTime(retryOptions.timeout, retryOptions.growthFactor, retryOptions.retries)
   }
 }
 
@@ -125,7 +130,6 @@ const preserveFetchPromise = (url, options, activeAttempts, attemptNumber, remai
       if (statusCodes.includes(response.status)) {
         reject(new Error(`Bad Response`))
       } else {
-        updateBaseTimeout(Date.now() - startTime)
         resolve(response)
       }
     } catch (error) {
@@ -133,7 +137,6 @@ const preserveFetchPromise = (url, options, activeAttempts, attemptNumber, remai
       reject(error)
     }
   }).then(response => {
-    updateBaseTimeout(Date.now() - startTime)
     return ({ success: true, promise: fetchPromise, attemptNumber: attemptNumber, response })
   })
   const attemptarr = [fetchPromise,
