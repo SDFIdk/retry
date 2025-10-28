@@ -183,7 +183,7 @@ const retryPromiseAttempt = async (attemptNumber, activeAttempts, url, options, 
   } else {
     activeAttempts.push(attemptResult.promise)
     
-    return retryPromiseAttempt(attemptNumber + 1, activeAttempts, url, options, totalTimeout - optionsClone.timeout)
+    return retryPromiseAttempt(attemptNumber + 1, activeAttempts, url, optionsClone, totalTimeout - optionsClone.timeout)
   }
 }
 
