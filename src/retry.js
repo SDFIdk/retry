@@ -42,6 +42,7 @@ function updateBaseTimeout(responseTime) {
  */
 async function fetchWithTimeout(url, options = {}) {
   const { timeout = retryOptions.timeout } = options
+  console.log('timeout', timeout)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
   const response = await fetch(url, {
@@ -112,7 +113,6 @@ const preserveFetchPromise = (url, options, activeAttempts, attemptNumber, remai
   } = options
 
   const startTime = Date.now()
-  let timedOut = false
   const clonedOptions = structuredClone(options)
   clonedOptions.timeout = remainingTime
   const fetchPromise = new Promise(async (resolve, reject) => {
@@ -123,7 +123,7 @@ const preserveFetchPromise = (url, options, activeAttempts, attemptNumber, remai
       updateBaseTimeout(responseTime)
 
       if (statusCodes.includes(response.status)) {
-        reject(new Error(`Kald ${url} returnerede fejlkode ${response.status}`))
+        reject(new Error(`Bad Response`))
       } else {
         updateBaseTimeout(Date.now() - startTime)
         resolve(response)
@@ -139,7 +139,6 @@ const preserveFetchPromise = (url, options, activeAttempts, attemptNumber, remai
   const attemptarr = [fetchPromise,
     new Promise(resolve => {
       setTimeout(() => {
-        timedOut = true
         resolve({ success: false, promise: fetchPromise, attemptNumber: attemptNumber })
       }, timeout)
     }),
@@ -162,9 +161,8 @@ const preserveFetchPromise = (url, options, activeAttempts, attemptNumber, remai
  * @returns {Promise<Response>} Resolves with first successful response from any attempt
  * @throws {AggregateError} When all attempts fail or exceed total timeout
  */
-const retryPromiseAttempt = async (attemptNumber, activeAttempts, url, options) => {
-
-  const totalTimeout = retryOptions.totalTimeout
+const retryPromiseAttempt = async (attemptNumber, activeAttempts, url, options, totalTimeout) => {
+  console.log(attemptNumber)
   // Base case: all retries exhausted, wait for any active fetch to complete
   if (attemptNumber > retryOptions.retries) {
     return Promise.any(activeAttempts)
@@ -176,7 +174,7 @@ const retryPromiseAttempt = async (attemptNumber, activeAttempts, url, options) 
     optionsClone.timeout = options.timeout * retryOptions.growthFactor
   }
 
-  const attemptResult = await preserveFetchPromise(url, optionsClone, activeAttempts, attemptNumber, totalTimeout - optionsClone.timeout )
+  const attemptResult = await preserveFetchPromise(url, optionsClone, activeAttempts, attemptNumber, totalTimeout)
 
   if (attemptResult.success) {
     //console.log(`Fetch Promise ${attemptResult.attemptNumber} out of ${attemptNumber}`)
@@ -184,7 +182,7 @@ const retryPromiseAttempt = async (attemptNumber, activeAttempts, url, options) 
   } else {
     activeAttempts.push(attemptResult.promise)
     
-    return retryPromiseAttempt(attemptNumber + 1, activeAttempts, url, options)
+    return retryPromiseAttempt(attemptNumber + 1, activeAttempts, url, options, totalTimeout - optionsClone.timeout)
   }
 }
 
@@ -195,20 +193,21 @@ const retryPromiseAttempt = async (attemptNumber, activeAttempts, url, options) 
  * @param {string} url - The endpoint URL for the HTTP request
  * @param {Object} options - Fetch options (retries, timeout, growthFactor, statusCodes) as well as normal Fetch Headers
  * 
- * @returns {Promise<Response>} Resolves with first successful response from any attempt
+ * @returns {Promise<Response>} Resolves with first resolved response (failed or successfull) from any attempt
  * @throws {Error} When all retry attempts fail
  */
-const retryWithPromises = async (url, options = {}) => {
+const fetchWithRacedRetries = async (url, options = {}) => {
   const {
     timeout = retryOptions.timeout,
     statusCodes = retryOptions.statusCodes,
-    growthFactor = retryOptions.growthFactor
+    growthFactor = retryOptions.growthFactor,
+    totalTimeout = retryOptions.totalTimeout
   } = options
-
+  
   try {
-    return await retryPromiseAttempt(0, [], url, { ...options, timeout, statusCodes, growthFactor})
+    return await retryPromiseAttempt(0, [], url, { ...options, timeout, statusCodes, growthFactor}, totalTimeout)
   } catch (error) {
-    throw new Error(`All retries failed. Url: ${url}`)
+    throw new Error(`All retries failed. Url: ${url}, msg: ${error.message}`)
   }
 }
 
@@ -216,5 +215,7 @@ export {
   retryOptions,
   fetchWithTimeout,
   fetchWithRetry,
-  retryWithPromises
+  preserveFetchPromise,
+  retryPromiseAttempt,
+  fetchWithRacedRetries
 }

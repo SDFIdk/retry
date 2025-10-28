@@ -1,1 +1,1 @@
-export { retryOptions, fetchWithTimeout, fetchWithRetry, retryWithPromises } from './src/retry'
+export { retryOptions, fetchWithTimeout, fetchWithRetry, fetchWithRacedRetries} from './src/retry'
