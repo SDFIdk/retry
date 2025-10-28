@@ -47,7 +47,6 @@ function updateBaseTimeout(responseTime) {
  */
 async function fetchWithTimeout(url, options = {}) {
   const { timeout = retryOptions.timeout } = options
-  console.log('timeout', timeout)
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), timeout)
   const response = await fetch(url, {
@@ -165,7 +164,6 @@ const preserveFetchPromise = (url, options, activeAttempts, attemptNumber, remai
  * @throws {AggregateError} When all attempts fail or exceed total timeout
  */
 const retryPromiseAttempt = async (attemptNumber, activeAttempts, url, options, totalTimeout) => {
-  console.log(attemptNumber)
   // Base case: all retries exhausted, wait for any active fetch to complete
   if (attemptNumber > retryOptions.retries) {
     return Promise.any(activeAttempts)
