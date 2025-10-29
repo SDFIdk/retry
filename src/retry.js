@@ -4,7 +4,10 @@ import {
   RETRY_GROWTH_FACTOR,
   RETRY_STATUS_CODES,
   RETRY_DYNAMTIC_TIMEOUT,
-  getTotalTime
+  getTotalTime,
+  RETRY_DYNAMIC_MIN_TIMEOUT,
+  RETRY_DYNAMIC_MAX_TIMEOUT,
+  RETRY_DYNAMIC_HEURISTIC
 } from './constants.js'
 
 const retryOptions = {
@@ -13,29 +16,52 @@ const retryOptions = {
   growthFactor: RETRY_GROWTH_FACTOR,
   statusCodes: RETRY_STATUS_CODES,
   dynamicTimeout: RETRY_DYNAMTIC_TIMEOUT,
+  maxTimeout: RETRY_DYNAMIC_MAX_TIMEOUT,
+  minTimeout: RETRY_DYNAMIC_MIN_TIMEOUT,
+  timeoutSignalHeuristic: RETRY_DYNAMIC_HEURISTIC,
   totalTimeout: getTotalTime(RETRY_TIMEOUT, RETRY_GROWTH_FACTOR, RETRY_ATTEMPTS)
 }
 
 let fetchCount = 0
 let fetchResponseTimeSum = 0
+let timeoutSignalCount = 0
 
-function getAverageResponseTime() {
+const getAverageResponseTime = () => {
   return fetchResponseTimeSum / fetchCount
 }
 
-function updateBaseTimeout(responseTime) {
+const extendTimeout = () => {
+  const newTimeout = retryOptions.timeout * retryOptions.growthFactor
+  retryOptions.timeout =  newTimeout > retryOptions.maxTimeout ? retryOptions.maxTimeout : newTimeout
+  retryOptions.totalTime = getTotalTime(retryOptions.timeout, retryOptions.growthFactor, retryOptions.retries)
+}
+
+const contractTimeout = () => {
+  const newTimeout = retryOptions.timeout * (1 / retryOptions.growthFactor)
+  retryOptions.timeout *= newTimeout < retryOptions.minTimeout ? retryOptions.minTimeout : newTimeout 
+  retryOptions.totalTime = getTotalTime(retryOptions.timeout, retryOptions.growthFactor, retryOptions.retries)
+}
+
+
+const updateBaseTimeout = (responseTime) => {
   if (!retryOptions.dynamicTimeout) return
   fetchCount += 1
-  fetchResponseTimeSum += responseTime
-  // Increase max timeout when average response time is more than half of the max.
-  if (getAverageResponseTime() > retryOptions.timeout / 2) {
-    retryOptions.timeout *= retryOptions.growthFactor
-    retryOptions.totalTime = getTotalTime(retryOptions.timeout, retryOptions.growthFactor, retryOptions.retries)
-
-  // Reduce max timeout when the average response time is less than a quarter of the max.
-  } else if (getAverageResponseTime() < retryOptions.timeout / 4) {
-    retryOptions.timeout *= (1 / retryOptions.growthFactor) * 1.5
-    retryOptions.totalTime = getTotalTime(retryOptions.timeout, retryOptions.growthFactor, retryOptions.retries)
+  //Guard against against outliers that do not reflect average response time (i.e move stably up or down untill equilibrium is reached)
+  fetchResponseTimeSum += responseTime > retryOptions.timeout*3 ? retryOptions.timeout : responseTime 
+  // Increase max timeout when average response time is more than 3/5 of the max.
+  if (getAverageResponseTime() > retryOptions.timeout * 0.6) {
+    timeoutSignalCount++
+    if(timeoutSignalCount >= retryOptions.timeoutSignalHeuristic) {
+      extendTimeout()
+      timeoutSignalCount = 0    
+    }
+  // Reduce max timeout when the average response time is less than 1/4 of the max.
+  } else if (getAverageResponseTime() < retryOptions.timeout * 0.25) {
+    timeoutSignalCount--
+    if(timeoutSignalCount <= retryOptions.timeoutSignalHeuristic) {
+      contractTimeout()
+      timeoutSignalCount = 0    
+    }
   }
 }
 
