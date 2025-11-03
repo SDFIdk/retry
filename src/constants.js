@@ -10,7 +10,7 @@ export const RETRY_STATUS_CODES = [408, 500, 502, 503, 504, 506, 507, 508, 510]
 export const RETRY_DYNAMTIC_TIMEOUT = true
 
 // The maximum timeout allowed (set to Number.MAX_SAFE_INTEGER for compatability with previous version)
-export const RETRY_DYNAMIC_MAX_TIMEOUT = Number.MAX_SAFE_INTEGER
+export const RETRY_DYNAMIC_MAX_TIMEOUT = 5000
 // The minimum timeout allowed (set to 0 for compatability with previous version)
 export const RETRY_DYNAMIC_MIN_TIMEOUT = 0
 // The amount of consecutive times the average is above or below the threshhold required to trigger an expansion or contraction of the timeout

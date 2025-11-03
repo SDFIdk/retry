@@ -4,10 +4,10 @@ import {
   RETRY_GROWTH_FACTOR,
   RETRY_STATUS_CODES,
   RETRY_DYNAMTIC_TIMEOUT,
-  getTotalTime,
   RETRY_DYNAMIC_MIN_TIMEOUT,
   RETRY_DYNAMIC_MAX_TIMEOUT,
-  RETRY_DYNAMIC_HEURISTIC
+  RETRY_DYNAMIC_HEURISTIC,
+  getTotalTime,
 } from './constants.js'
 
 const retryOptions = {
@@ -22,12 +22,17 @@ const retryOptions = {
   totalTimeout: getTotalTime(RETRY_TIMEOUT, RETRY_GROWTH_FACTOR, RETRY_ATTEMPTS)
 }
 
-let fetchCount = 0
-let fetchResponseTimeSum = 0
+const WINDOW_SIZE  = 10
+let responseTimeWindow = []
 let timeoutSignalCount = 0
 
 const getAverageResponseTime = () => {
-  return fetchResponseTimeSum / fetchCount
+  if (responseTimeWindow.length === 0) return 0
+  const sum = responseTimeWindow.reduce((acc, val) => acc + val, 0)
+  return sum / responseTimeWindow.length
+}
+const resetTimeoutCalc = () => {
+  responseTimeWindow = []
 }
 
 const extendTimeout = () => {
@@ -37,28 +42,40 @@ const extendTimeout = () => {
 }
 
 const contractTimeout = () => {
-  const newTimeout = retryOptions.timeout * (1 / retryOptions.growthFactor)
-  retryOptions.timeout *= newTimeout < retryOptions.minTimeout ? retryOptions.minTimeout : newTimeout 
+  const contractFactor = (1/retryOptions.growthFactor)
+  const newTimeout = retryOptions.timeout * contractFactor
+  retryOptions.timeout = newTimeout < retryOptions.minTimeout ? retryOptions.minTimeout : newTimeout 
   retryOptions.totalTime = getTotalTime(retryOptions.timeout, retryOptions.growthFactor, retryOptions.retries)
 }
 
 
 const updateBaseTimeout = (responseTime) => {
+
   if (!retryOptions.dynamicTimeout) return
-  fetchCount += 1
-  //Guard against against outliers that do not reflect average response time (i.e move stably up or down untill equilibrium is reached)
-  fetchResponseTimeSum += responseTime > retryOptions.timeout*3 ? retryOptions.timeout : responseTime 
-  // Increase max timeout when average response time is more than 3/5 of the max.
+  
+  // Guard against outliers
+  const guardedResponseTime = responseTime > retryOptions.timeout * 3 
+    ? retryOptions.timeout 
+    : responseTime
+  
+  // Add new measurement
+  responseTimeWindow.push(guardedResponseTime)
+  
+  // Remove oldest if window is full
+  if (responseTimeWindow.length > WINDOW_SIZE) {
+    responseTimeWindow.shift()
+  }
+  
+  
   if (getAverageResponseTime() > retryOptions.timeout * 0.6) {
     timeoutSignalCount++
-    if(timeoutSignalCount >= retryOptions.timeoutSignalHeuristic) {
+    if (timeoutSignalCount >= retryOptions.timeoutSignalHeuristic) {
       extendTimeout()
       timeoutSignalCount = 0    
     }
-  // Reduce max timeout when the average response time is less than 1/4 of the max.
-  } else if (getAverageResponseTime() < retryOptions.timeout * 0.25) {
+  } else if (getAverageResponseTime() < retryOptions.timeout * 0.3) {
     timeoutSignalCount--
-    if(timeoutSignalCount <= retryOptions.timeoutSignalHeuristic) {
+    if (timeoutSignalCount <= -retryOptions.timeoutSignalHeuristic) {
       contractTimeout()
       timeoutSignalCount = 0    
     }
@@ -157,9 +174,10 @@ const preserveFetchPromise = (url, options, preserveOptions) => {
     remainingTime
   } = preserveOptions
 
-  const startTime = Date.now()
+
   const clonedOptions = structuredClone(options)
   clonedOptions.timeout = remainingTime
+  const startTime = Date.now()
 
   // Create the fetch promise that will resolve/reject based on response
   const fetchPromise = (async () => {
@@ -258,7 +276,7 @@ const retryPromiseAttempt = async (url, options, preserveOptions) => {
 
 
   if (attemptResult.success) {
-    //console.log(`Fetch Promise ${attemptResult.attemptNumber} out of ${attemptNumber}`)
+    //console.log(`Fetch Promise ${attemptResult.attemptNumber} out of ${attemptNumber}`, attemptResult)
     return attemptResult.response
   }
 
@@ -306,6 +324,7 @@ const fetchWithRacedRetries = async (url, options = {}) => {
 
 export {
   retryOptions,
+  resetTimeoutCalc,
   getTotalTime,
   fetchWithTimeout,
   fetchWithRetry,

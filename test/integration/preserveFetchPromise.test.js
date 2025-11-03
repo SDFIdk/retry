@@ -82,7 +82,6 @@ describe('preserveFetchTests', async () => {
         0,
         400
       )
-      console.log(weakTimedOutResponse)
       assert(weakTimedOutResponse.success === false && !weakTimedOutResponse?.response)
       const throwingResponse = await (preserveFetchPromise(
         url,
@@ -93,7 +92,6 @@ describe('preserveFetchTests', async () => {
       ))
       assert.fail('Error was not thrown')
     } catch (error) {
-      console.log(error)
       assert.equal(error.message, 'Bad Response')
     }
   }),
