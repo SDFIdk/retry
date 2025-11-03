@@ -15,6 +15,8 @@ export const RETRY_DYNAMIC_MAX_TIMEOUT = 5000
 export const RETRY_DYNAMIC_MIN_TIMEOUT = 0
 // The amount of consecutive times the average is above or below the threshhold required to trigger an expansion or contraction of the timeout
 export const RETRY_DYNAMIC_HEURISTIC = 3
+// Window Size for sliding average
+export const WINDOW_SIZE  = 10
 // A helperfunction to calculate the total timeout for fetchWithRacedRetries
 export const getTotalTime = (timeout, growthfactor, retries) => {
   let tempTimeout = timeout

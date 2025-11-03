@@ -7,6 +7,7 @@ import {
   RETRY_DYNAMIC_MIN_TIMEOUT,
   RETRY_DYNAMIC_MAX_TIMEOUT,
   RETRY_DYNAMIC_HEURISTIC,
+  WINDOW_SIZE,
   getTotalTime,
 } from './constants.js'
 
@@ -22,7 +23,7 @@ const retryOptions = {
   totalTimeout: getTotalTime(RETRY_TIMEOUT, RETRY_GROWTH_FACTOR, RETRY_ATTEMPTS)
 }
 
-const WINDOW_SIZE  = 10
+
 let responseTimeWindow = []
 let timeoutSignalCount = 0
 
